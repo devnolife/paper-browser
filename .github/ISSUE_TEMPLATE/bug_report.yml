@@ -1,0 +1,40 @@
+name: Laporan bug
+description: Laporkan error atau hasil yang tidak sesuai.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Terima kasih sudah melapor. Untuk pertanyaan cara pakai, silakan ke [Discussions (Q&A)](https://github.com/devnolife/paper-browser/discussions/categories/q-a).
+  - type: textarea
+    id: kejadian
+    attributes:
+      label: Apa yang terjadi?
+      description: Jelaskan masalahnya dan apa yang seharusnya terjadi.
+    validations:
+      required: true
+  - type: textarea
+    id: langkah
+    attributes:
+      label: Langkah untuk mengulang
+      description: Perintah yang dijalankan (CLI atau web), kata kunci atau URL, dan mode sumber yang dipakai.
+      placeholder: |
+        1. .venv\Scripts\python.exe cari_jurnal.py "algoritma greedy penjadwalan" --mode katalog_saja
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Pesan error atau log
+      description: Tempel keluaran terminal yang relevan. Hapus data pribadi, cookie, atau token bila ada.
+      render: text
+  - type: input
+    id: lingkungan
+    attributes:
+      label: Lingkungan
+      description: Sistem operasi dan versi Python.
+      placeholder: Windows 11, Python 3.13.2
+    validations:
+      required: true
