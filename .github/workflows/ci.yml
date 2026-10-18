@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tes:
+    name: Tes (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Pasang dependensi
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Cek sintaks
+        run: python -m compileall -q jurnal tests buka_jurnal.py cari_jurnal.py katalog_jurnal.py web_jurnal.py
+
+      - name: Jalankan tes
+        run: python -m pytest
