@@ -1,10 +1,20 @@
 # paper-browser
 
+[![CI](https://github.com/devnolife/paper-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/devnolife/paper-browser/actions/workflows/ci.yml)
+[![Lisensi: MIT](https://img.shields.io/badge/lisensi-MIT-blue.svg)](LICENSE)
+![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)
+
 **Paper Browser** adalah alat lokal untuk mencari artikel jurnal Indonesia yang berkaitan dengan sebuah topik,
 judul, atau artikel, tanpa Google Scholar. Kata kunci dicari langsung lewat fitur cari situs-situs jurnal
 (Open Journal Systems) yang tercatat di katalog; Bing dan Brave hanya cadangan. Setiap artikel diverifikasi dari
 metadata halamannya, dikelompokkan per jurnal beserta link website-nya, lalu dicek apakah PDF-nya benar-benar bisa
 diunduh.
+
+> **In English:** Paper Browser is a local tool for finding Indonesian journal articles related to a topic, title, or
+> article without Google Scholar. It sends keywords straight to the built-in search of Open Journal Systems (OJS)
+> journal sites in its catalog (seeded from DOAJ), with Bing and Brave only as a fallback. Each article is verified
+> from its page metadata, grouped by journal, and checked for a PDF that can actually be downloaded. It has a web UI
+> and a CLI, with JSON and Markdown export.
 
 ## Fitur
 
@@ -55,6 +65,16 @@ Atau pakai CLI. Hasil pencarian disimpan di `hasil/` sebagai JSON dan Markdown; 
 .venv\Scripts\python.exe buka_jurnal.py https://jurnal.komputasi.org/index.php/jst/article/view/28
 ```
 
+## Pengujian
+
+Unit test tidak memakai jaringan maupun browser, dan dijalankan otomatis oleh CI (Ubuntu dan Windows) di setiap push
+dan pull request.
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.venv\Scripts\python.exe -m pytest
+```
+
 ## Cara kerja
 
 Arsitekturnya *federated search*: satu kueri dikirim ke banyak koleksi (situs jurnal), lalu hasilnya digabung dan
@@ -97,4 +117,14 @@ web_jurnal.py       server web lokal (hanya 127.0.0.1)
 cari_jurnal.py      CLI pencarian
 katalog_jurnal.py   CLI katalog
 buka_jurnal.py      buka dan analisis satu artikel
+tests/              unit test (pytest)
 ```
+
+## Pertanyaan dan masukan
+
+Pertanyaan cara pakai bisa diajukan di [Discussions (Q&A)](https://github.com/devnolife/paper-browser/discussions/categories/q-a).
+Laporan bug dan usulan fitur lewat [Issues](https://github.com/devnolife/paper-browser/issues).
+
+## Lisensi
+
+[MIT](LICENSE)
