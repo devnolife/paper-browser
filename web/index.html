@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Paper Browser</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23111111'/%3E%3Crect x='9' y='9' width='5' height='5' fill='%23e61919'/%3E%3C/svg%3E">
+<style>
+  /* Swiss Industrial: kertas, tinta, satu aksen merah. Sudut siku, garis grid tegas, tanpa bayangan atau gradasi halus. */
+  :root {
+    color-scheme: light;
+    --kertas: #f4f4f0;
+    --kertas-2: #eae8e3;
+    --isian: #fbfbf8;
+    --tinta: #111111;
+    --redup: #5a5a55;
+    --merah: #e61919;
+    --merah-teks: #b3120f; /* merah untuk teks kecil, kontras >= 4,5:1 di atas kertas */
+    --berat: "Archivo Black", "Arial Black", "Segoe UI Black", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --badan: "Inter", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+    --mono: "JetBrains Mono", "IBM Plex Mono", "Cascadia Mono", Consolas, ui-monospace, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html {
+    /* Butiran halus seperti kertas cetak; dipasang di kanvas agar menutup seluruh layar. */
+    background: var(--kertas) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .055 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  body {
+    margin: 0;
+    color: var(--tinta);
+    font: 15px/1.5 var(--badan);
+  }
+  ::selection { background: var(--merah); color: #fff; }
+  :focus-visible { outline: 3px solid var(--merah); outline-offset: 2px; }
+  h1, h2, p, dl, dd { margin: 0; }
+  a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { color: var(--merah-teks); text-decoration-thickness: 2px; }
+  button { font: inherit; color: inherit; border-radius: 0; }
+
+  .label {
+    font: 700 .7rem/1.3 var(--mono);
+    letter-spacing: .09em;
+    text-transform: uppercase;
+  }
+  .mono { font-family: var(--mono); }
+  .kecil { font-size: .84rem; }
+  .redup { color: var(--redup); }
+  .teks-merah { color: var(--merah-teks); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sub { display: block; margin-top: 3px; font: .74rem/1.4 var(--mono); color: var(--redup); overflow-wrap: anywhere; }
+
+  .halaman { max-width: 1240px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 44px) 56px; }
+
+  /* Kepala */
+  .kepala { padding: 16px 0 26px; border-bottom: 6px solid var(--merah); }
+  .kepala-atas {
+    display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 24px;
+    padding-bottom: 10px; border-bottom: 2px solid var(--tinta);
+  }
+  .kepala-isi {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 330px);
+    gap: 18px 40px; align-items: end; margin-top: 24px;
+  }
+  .judul-besar {
+    font: 900 clamp(3rem, 10.5vw, 7.6rem)/.84 var(--berat);
+    letter-spacing: -.045em;
+    text-transform: uppercase;
+  }
+  .judul-besar .baris { display: block; }
+  .titik { color: var(--merah); }
+  .tagline { font-size: 1rem; line-height: 1.5; }
+
+  /* Bagian bernomor: label di samping, isi di kanan */
+  .bagian {
+    display: grid; grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
+    gap: 14px 40px; padding: 22px 0 34px; border-bottom: 2px solid var(--tinta);
+  }
+  .bagian-label { position: sticky; top: 18px; align-self: start; display: grid; gap: 10px; justify-items: start; }
+  .bagian-label .no { color: var(--merah-teks); }
+  .bagian-label h2 { font: 900 clamp(1.5rem, 2.5vw, 2.05rem)/.92 var(--berat); letter-spacing: -.03em; text-transform: uppercase; }
+  .bagian-isi { display: grid; gap: 16px; align-content: start; min-width: 0; }
+
+  /* Tombol */
+  .tombol-garis {
+    cursor: pointer; background: transparent; border: 2px solid var(--tinta); padding: 9px 13px;
+    font: 700 .7rem/1.15 var(--mono); letter-spacing: .09em; text-transform: uppercase;
+    transition: background-color .12s, color .12s;
+  }
+  .tombol-garis:hover:not(:disabled) { background: var(--tinta); color: var(--kertas); }
+  .tombol-garis:disabled { opacity: .5; cursor: progress; }
+  .tombol-teks {
+    cursor: pointer; background: none; border: 0; padding: 2px 0; color: var(--merah-teks);
+    font: 700 .7rem/1.15 var(--mono); letter-spacing: .09em; text-transform: uppercase;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+
+  /* Form cari */
+  .form-cari { display: grid; gap: 16px; }
+  .form-cari > label { margin-bottom: -8px; }
+  .baris-cari { display: grid; grid-template-columns: minmax(0, 1fr) auto; border: 3px solid var(--tinta); background: var(--isian); }
+  .baris-cari:has(#q:focus-visible) { outline: 3px solid var(--merah); outline-offset: 2px; }
+  #q {
+    min-width: 0; border: 0; outline: 0; background: transparent; color: inherit;
+    font: 700 clamp(1.05rem, 1.8vw, 1.35rem)/1.2 var(--badan); padding: 16px 18px;
+  }
+  ::placeholder { color: #6e6e68; font-weight: 400; opacity: 1; }
+  .tombol-utama {
+    cursor: pointer; border: 0; border-left: 3px solid var(--tinta);
+    background: var(--tinta); color: var(--kertas); padding: 0 clamp(18px, 3vw, 34px);
+    font: 900 1.05rem/1 var(--berat); letter-spacing: .02em; text-transform: uppercase;
+    transition: background-color .12s;
+  }
+  .tombol-utama:not(:disabled)::after { content: "\00a0→"; }
+  .tombol-utama:hover:not(:disabled) { background: var(--merah); }
+  .tombol-utama:focus-visible { outline: 3px solid var(--merah); outline-offset: -8px; }
+  .tombol-utama:disabled { cursor: progress; background: var(--redup); }
+
+  fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+  legend { padding: 0; }
+  .segmen legend { margin-bottom: 8px; }
+  .segmen-isi { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 2px solid var(--tinta); }
+  .segmen-isi label {
+    position: relative; display: grid; gap: 4px; align-content: start; padding: 10px 12px 11px;
+    border-left: 2px solid var(--tinta); cursor: pointer; transition: background-color .12s;
+  }
+  .segmen-isi label:first-child { border-left: 0; }
+  .segmen-isi label:hover { background: var(--kertas-2); }
+  .segmen-isi input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .segmen-isi small { font-size: .8rem; line-height: 1.3; color: var(--redup); }
+  .segmen-isi label:has(input:checked) { background: var(--tinta); color: var(--kertas); }
+  .segmen-isi label:has(input:checked) small { color: #d2d2cb; }
+  .segmen-isi label:has(input:checked) .label::before { content: "■\00a0"; content: "■\00a0" / ""; color: var(--merah); }
+  .segmen-isi label:has(input:focus-visible) { outline: 3px solid var(--merah); outline-offset: -6px; }
+
+  /* Lipatan (opsi lanjutan, rincian, tambah URL) */
+  .lipat { border-top: 2px solid var(--tinta); }
+  .lipat > summary {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 10px 0;
+    cursor: pointer; list-style: none;
+  }
+  .lipat > summary::-webkit-details-marker { display: none; }
+  .lipat > summary::before {
+    content: "+"; content: "+" / "";
+    display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px;
+    border: 2px solid var(--tinta); font: 700 15px/1 var(--mono);
+  }
+  .lipat[open] > summary::before { content: "−"; content: "−" / ""; background: var(--tinta); color: var(--kertas); }
+  .lipat > summary:hover::before { background: var(--merah); border-color: var(--merah); color: #fff; }
+  .isi-lipat { display: grid; gap: 14px; padding: 4px 0 14px; }
+
+  .kotak-opsi {
+    display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+    border-top: 2px solid var(--tinta); border-left: 2px solid var(--tinta);
+  }
+  .isian {
+    display: grid; gap: 8px; align-content: start; min-width: 0; margin: 0; padding: 12px;
+    border: 0; border-right: 2px solid var(--tinta); border-bottom: 2px solid var(--tinta);
+  }
+  .isian.dua { grid-column: span 2; }
+  .isian.penuh { grid-column: 1 / -1; }
+  .isian > legend { float: left; width: 100%; margin: 0; }
+  .isian:has(> input:disabled), fieldset.isian:disabled { opacity: .45; }
+  .deret { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 22px; }
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%; min-width: 0; color: inherit; background: var(--isian);
+    border: 2px solid var(--tinta); border-radius: 0; padding: 8px 10px;
+    font: 600 .95rem/1.25 var(--badan);
+  }
+  select {
+    appearance: none; padding-right: 34px; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 0h12L6 8z' fill='%23111111'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 11px center;
+  }
+  textarea { resize: vertical; min-height: 96px; font: .9rem/1.45 var(--mono); }
+  input:disabled, select:disabled { cursor: not-allowed; }
+  .cek { display: inline-flex; align-items: center; gap: 10px; min-height: 32px; cursor: pointer; font-size: .92rem; }
+  input[type="checkbox"] {
+    appearance: none; flex: none; width: 18px; height: 18px; margin: 0; cursor: pointer;
+    border: 2px solid var(--tinta); border-radius: 0; background: var(--isian);
+  }
+  input[type="checkbox"]:checked {
+    background: var(--tinta) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 10'%3E%3Cpath d='M1 5.2l3.4 3.3L11 1.5' fill='none' stroke='%23f4f4f0' stroke-width='2.6'/%3E%3C/svg%3E") center / 11px no-repeat;
+  }
+  .catatan { max-width: 72ch; }
+
+  /* Status pencarian */
+  .status { display: grid; gap: 6px; }
+  .status:has(#status:empty):has(#garis-proses[hidden]) { display: none; }
+  #kemajuan:empty { display: none; }
+  .garis-proses {
+    height: 12px; border: 2px solid var(--tinta);
+    background: repeating-linear-gradient(45deg, var(--tinta) 0 7.07px, transparent 7.07px 14.142px);
+    animation: maju .6s linear infinite;
+  }
+  @keyframes maju { to { background-position: 20px 0; } }
+  .baris-status { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; min-height: 1.4em; font: 700 .88rem/1.4 var(--mono); }
+  #status.galat { color: var(--merah-teks); }
+  #status.galat::before { content: "✕\00a0"; content: "✕\00a0" / ""; }
+  #detik { font-variant-numeric: tabular-nums; }
+  #kemajuan { font: .8rem/1.4 var(--mono); color: var(--redup); overflow-wrap: anywhere; }
+  #kemajuan:not(:empty)::before { content: ">\00a0"; content: ">\00a0" / ""; color: var(--merah-teks); }
+
+  /* Hasil */
+  .angka-angka { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 2px solid var(--tinta); }
+  .angka { display: grid; gap: 12px; align-content: space-between; min-width: 0; padding: 14px 16px 12px; border-left: 2px solid var(--tinta); }
+  .angka:first-child { border-left: 0; }
+  .besar { font: 900 clamp(2.6rem, 6.5vw, 5.4rem)/.85 var(--berat); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+  .angka.utama .besar { color: var(--merah); }
+  .tag-tag { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; }
+  .tag {
+    display: inline-flex; flex-wrap: wrap; gap: 0 7px; align-items: baseline; padding: 5px 9px;
+    border: 2px solid var(--tinta); font: 600 .7rem/1.25 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+  }
+  .tag-mati { border-style: dashed; border-color: var(--redup); color: var(--redup); }
+  .tag-masalah { background: var(--merah); border-color: var(--merah); color: #fff; }
+  .sumber-artikel { border-left: 4px solid var(--tinta); padding-left: 12px; overflow-wrap: anywhere; }
+  .saran { border: 2px solid var(--merah); border-left-width: 12px; padding: 12px 14px; font-size: .92rem; }
+  .kotak-data { display: flex; flex-wrap: wrap; border-top: 1px solid var(--tinta); border-left: 1px solid var(--tinta); }
+  .kotak-data > div { flex: 1 1 140px; padding: 10px 12px; border-right: 1px solid var(--tinta); border-bottom: 1px solid var(--tinta); }
+  .kotak-data dt { font: 700 .66rem/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--redup); }
+  .kotak-data dd { margin-top: 6px; font: 900 1.3rem/1 var(--berat); font-variant-numeric: tabular-nums; }
+  .daftar-gagal { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; overflow-wrap: anywhere; }
+
+  /* Tabel */
+  .gulir { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  thead th {
+    padding: 8px 10px; border-bottom: 3px solid var(--tinta); text-align: left; vertical-align: bottom; white-space: nowrap;
+    font: 700 .68rem/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+  }
+  thead th.num { text-align: right; }
+  td { padding: 11px 10px; border-bottom: 1px solid var(--tinta); vertical-align: top; }
+  tbody tr:hover { background: var(--kertas-2); }
+  td.nomor-baris { width: 3.2rem; font: 700 .78rem/1.6 var(--mono); color: var(--redup); }
+  td.jumlah { font: 900 1.25rem/1 var(--berat); }
+  td.waktu { white-space: nowrap; font: .8rem/1.5 var(--mono); }
+  .nama-jurnal { font-weight: 700; text-decoration: none; }
+  a.nama-jurnal:hover { text-decoration: underline; }
+
+  /* Daftar artikel */
+  .alat-daftar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 16px; }
+  .daftar-artikel { list-style: none; margin: 0; padding: 0; border-top: 3px solid var(--tinta); }
+  .artikel {
+    display: grid; grid-template-columns: 2.4rem minmax(0, 1fr) auto; gap: 8px 18px;
+    padding: 14px 10px; border-bottom: 1px solid var(--tinta);
+  }
+  .artikel:hover { background: var(--kertas-2); }
+  .artikel .nomor { font: 700 .78rem/1.7 var(--mono); color: var(--redup); }
+  .isi-artikel { min-width: 0; overflow-wrap: anywhere; }
+  .judul-artikel { font-size: 1.02rem; font-weight: 700; line-height: 1.32; text-decoration: none; }
+  a.judul-artikel:hover { text-decoration: underline; }
+  .meta-artikel { margin-top: 5px; font: .74rem/1.45 var(--mono); color: var(--redup); }
+  .meta-artikel a { color: var(--tinta); }
+  .blok-pdf { display: grid; justify-items: end; align-content: start; gap: 6px; min-width: 150px; text-align: right; }
+  .tombol-pdf {
+    display: inline-block; padding: 9px 12px; white-space: nowrap; text-decoration: none;
+    background: var(--tinta); color: var(--kertas); border: 2px solid var(--tinta);
+    font: 700 .7rem/1 var(--mono); letter-spacing: .09em; text-transform: uppercase;
+    transition: background-color .12s, border-color .12s;
+  }
+  .tombol-pdf:hover { background: var(--merah); border-color: var(--merah); color: #fff; }
+  .status-pdf {
+    padding: 6px 9px; border: 2px dashed var(--redup); color: var(--redup);
+    font: 700 .68rem/1.3 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+  }
+  .status-pdf.buruk { border: 2px solid var(--merah); color: var(--merah-teks); }
+  .ket-pdf { max-width: 230px; font: .7rem/1.4 var(--mono); color: var(--redup); overflow-wrap: anywhere; }
+  .daftar-artikel .kosong { padding: 18px 10px; border-bottom: 1px solid var(--tinta); color: var(--redup); }
+
+  /* Katalog */
+  .ringkas-katalog { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px 28px; align-items: start; }
+  .angka-katalog { display: grid; gap: 10px; }
+  .angka-katalog .besar { font-size: clamp(2.6rem, 6vw, 4.6rem); }
+  #pesan-katalog { font: .8rem/1.45 var(--mono); color: var(--redup); }
+  #pesan-katalog.galat { color: var(--merah-teks); }
+  #pesan-katalog:empty { display: none; }
+
+  .kaki { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; padding-top: 14px; color: var(--redup); }
+
+  @media (max-width: 860px) {
+    .bagian { grid-template-columns: 1fr; }
+    .bagian-label { position: static; grid-template-columns: auto 1fr auto; align-items: end; justify-items: start; width: 100%; }
+    .bagian-label > :last-child:not(h2) { justify-self: end; }
+    .kepala-isi { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .segmen-isi { grid-template-columns: 1fr 1fr; }
+    .segmen-isi label:nth-child(3) { border-left: 0; }
+    .segmen-isi label:nth-child(n + 3) { border-top: 2px solid var(--tinta); }
+    .kotak-opsi { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .isian.lebar { grid-column: 1 / -1; }
+    .isian.dua { grid-column: span 1; }
+    .ringkas-katalog { grid-template-columns: 1fr; }
+    .artikel { grid-template-columns: 2rem minmax(0, 1fr); }
+    .blok-pdf { grid-column: 2; justify-items: start; min-width: 0; text-align: left; }
+    .angka { padding: 12px 10px 10px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .garis-proses { animation: none; }
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="halaman">
+  <header class="kepala">
+    <div class="kepala-atas label">
+      <span>Pencari judul jurnal terkait</span>
+      <span id="meta-katalog">Katalog —</span>
+      <span id="meta-host">Lokal</span>
+    </div>
+    <div class="kepala-isi">
+      <h1 class="judul-besar"><span class="baris">Paper</span> <span class="baris">Browser<span class="titik" aria-hidden="true">.</span></span></h1>
+      <p class="tagline">
+        Ketik topik atau tempel URL artikel. Kata kuncinya dicari langsung di situs-situs jurnal, lalu tiap artikel
+        dicek: jurnalnya, link website-nya, dan apakah PDF-nya benar-benar bisa diunduh.
+      </p>
+    </div>
+  </header>
+
+  <main>
+    <section class="bagian" aria-labelledby="judul-cari">
+      <div class="bagian-label">
+        <span class="label no">01</span>
+        <h2 id="judul-cari">Cari</h2>
+      </div>
+      <div class="bagian-isi">
+        <form id="form-cari" class="form-cari">
+          <label for="q" class="label">Topik, judul, atau URL artikel</label>
+          <div class="baris-cari">
+            <input id="q" name="q" type="text" required autocomplete="off" placeholder="mis. algoritma greedy penjadwalan">
+            <button id="tombol" class="tombol-utama" type="submit">Cari</button>
+          </div>
+
+          <fieldset id="pilih-mode" class="segmen">
+            <legend class="label">Sumber pencarian</legend>
+            <div class="segmen-isi">
+              <label><input type="radio" name="mode" value="katalog_dulu" checked><span class="label">Katalog dulu</span><small>Bing/Brave bila hasil kurang</small></label>
+              <label><input type="radio" name="mode" value="katalog_saja"><span class="label">Katalog saja</span><small>hanya situs jurnal</small></label>
+              <label><input type="radio" name="mode" value="gabung"><span class="label">Gabung</span><small>katalog + Bing/Brave</small></label>
+              <label><input type="radio" name="mode" value="mesin"><span class="label">Bing/Brave</span><small>tanpa katalog</small></label>
+            </div>
+          </fieldset>
+
+          <details id="opsi-lanjut" class="lipat">
+            <summary><span class="label">Opsi lanjutan</span><span id="ringkas-opsi" class="label teks-merah"></span></summary>
+            <div class="isi-lipat">
+              <div class="kotak-opsi">
+                <label class="isian lebar"><span class="label">Fokus situs</span>
+                  <input name="situs" type="text" autocomplete="off" placeholder="mis. jurnal.komputasi.org">
+                </label>
+                <label class="isian"><span class="label">Jurnal ditanya</span>
+                  <input name="jurnal_maks" id="jurnal-maks" type="number" min="1" max="1000" value="100" inputmode="numeric">
+                </label>
+                <label class="isian"><span class="label">Maks kandidat</span>
+                  <input name="maks" type="number" min="1" max="60" value="30" inputmode="numeric">
+                </label>
+                <fieldset id="pilih-mesin" class="isian">
+                  <legend class="label">Mesin pencari</legend>
+                  <div class="deret">
+                    <label class="cek"><input type="checkbox" name="mesin" value="bing" checked> Bing</label>
+                    <label class="cek"><input type="checkbox" name="mesin" value="brave" checked> Brave</label>
+                  </div>
+                </fieldset>
+                <label class="isian dua"><span class="label">Halaman per mesin</span>
+                  <select name="halaman"><option>1</option><option>2</option><option>3</option></select>
+                </label>
+                <div class="isian penuh deret">
+                  <label class="cek"><input type="checkbox" name="tampilkan" value="1"> Tampilkan browser (verifikasi sekarang)</label>
+                  <label class="cek"><input type="checkbox" name="cadangan" value="1" checked> Buka ulang yang diblokir lewat browser</label>
+                  <label class="cek"><input type="checkbox" name="segarkan" value="1"> Abaikan cache</label>
+                </div>
+              </div>
+              <p class="catatan kecil redup">
+                Hasil pencarian disimpan 24 jam. Jika Bing atau Brave meminta verifikasi, jendelanya dibuka otomatis:
+                selesaikan sendiri dalam 2 menit. Tanpa verifikasi, mesin itu diistirahatkan 30 menit dan sumber lain
+                tetap dipakai; centang “Tampilkan browser” untuk memverifikasi lebih cepat.
+              </p>
+            </div>
+          </details>
+        </form>
+
+        <div class="status">
+          <div id="garis-proses" class="garis-proses" hidden></div>
+          <p class="baris-status"><span id="status" role="status" aria-live="polite"></span><span id="detik" class="redup" aria-hidden="true"></span></p>
+          <p id="kemajuan" aria-live="polite"></p>
+        </div>
+      </div>
+    </section>
+
+    <div id="hasil" hidden>
+      <section class="bagian" aria-labelledby="judul-hasil">
+        <div class="bagian-label">
+          <span class="label no">02</span>
+          <h2 id="judul-hasil">Hasil</h2>
+          <button id="unduh" type="button" class="tombol-garis">Unduh JSON</button>
+        </div>
+        <div class="bagian-isi">
+          <div class="angka-angka">
+            <p class="angka utama"><span id="jumlah" class="besar">0</span><span class="label">Artikel ditemukan</span></p>
+            <p class="angka"><span id="jumlah-jurnal" class="besar">0</span><span class="label">Jurnal</span></p>
+            <p class="angka"><span id="jumlah-pdf" class="besar">0</span><span class="label">PDF bisa diunduh</span></p>
+          </div>
+          <ul id="sumber-hasil" class="tag-tag" aria-label="Sumber pencarian"></ul>
+          <p id="keterangan" class="mono kecil redup"></p>
+          <p id="sumber" class="sumber-artikel kecil" hidden></p>
+          <p id="saran" class="saran" hidden></p>
+          <details class="lipat">
+            <summary><span class="label">Rincian</span></summary>
+            <div class="isi-lipat">
+              <dl id="rincian-angka" class="kotak-data"></dl>
+              <p id="info-katalog" class="kecil"></p>
+              <p id="rincian-waktu" class="mono kecil redup"></p>
+              <div id="detail-gagal" hidden>
+                <p id="ringkasan-gagal" class="label"></p>
+                <ul id="daftar-gagal" class="daftar-gagal mono kecil"></ul>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <section class="bagian" aria-labelledby="judul-jurnal">
+        <div class="bagian-label">
+          <span class="label no">03</span>
+          <h2 id="judul-jurnal">Jurnal</h2>
+        </div>
+        <div class="bagian-isi">
+          <div class="gulir">
+            <table aria-labelledby="judul-jurnal">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Jurnal &amp; website</th>
+                  <th scope="col" class="num">Artikel</th>
+                </tr>
+              </thead>
+              <tbody id="daftar-jurnal"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="bagian" aria-labelledby="judul-artikel">
+        <div class="bagian-label">
+          <span class="label no">04</span>
+          <h2 id="judul-artikel">Artikel</h2>
+        </div>
+        <div class="bagian-isi">
+          <div class="alat-daftar">
+            <label class="cek"><input type="checkbox" id="hanya-pdf"> Hanya yang PDF-nya bisa diunduh</label>
+            <span id="info-filter" class="label redup"></span>
+          </div>
+          <ol id="daftar" class="daftar-artikel" role="list" aria-labelledby="judul-artikel"></ol>
+        </div>
+      </section>
+    </div>
+
+    <section id="katalog" class="bagian" aria-labelledby="judul-katalog">
+      <div class="bagian-label">
+        <span class="label no">05</span>
+        <h2 id="judul-katalog">Katalog</h2>
+        <button id="impor-doaj" type="button" class="tombol-garis">Impor / perbarui DOAJ</button>
+      </div>
+      <div class="bagian-isi">
+        <div class="ringkas-katalog">
+          <p class="angka-katalog"><span id="katalog-jumlah" class="besar">—</span><span id="katalog-situs" class="label">jurnal</span></p>
+          <dl id="katalog-sumber" class="kotak-data"></dl>
+        </div>
+        <p id="pesan-katalog" aria-live="polite"></p>
+        <details class="lipat">
+          <summary><span class="label">Tambah URL jurnal</span></summary>
+          <form id="form-tambah" class="isi-lipat">
+            <label for="url-jurnal" class="label">Satu URL per baris — beranda jurnal, atau URL artikel apa pun di situsnya</label>
+            <textarea id="url-jurnal" rows="4" required placeholder="https://jurnal.komputasi.org/index.php/jst"></textarea>
+            <div><button id="tombol-tambah" type="submit" class="tombol-garis">Tambah ke katalog</button></div>
+          </form>
+        </details>
+      </div>
+    </section>
+
+    <section id="bagian-riwayat" class="bagian" aria-labelledby="judul-riwayat" hidden>
+      <div class="bagian-label">
+        <span class="label no">06</span>
+        <h2 id="judul-riwayat">Riwayat</h2>
+        <button id="hapus-riwayat" type="button" class="tombol-teks">Hapus riwayat</button>
+      </div>
+      <div class="bagian-isi">
+        <div class="gulir">
+          <table aria-labelledby="judul-riwayat">
+            <thead>
+              <tr>
+                <th scope="col">Waktu</th>
+                <th scope="col">Kueri &amp; sumber</th>
+                <th scope="col" class="num">Artikel</th>
+                <th scope="col" class="num">Jurnal</th>
+                <th scope="col" class="num">PDF</th>
+                <th scope="col" class="num">Durasi</th>
+              </tr>
+            </thead>
+            <tbody id="riwayat"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="kaki label">
+    <span>Paper Browser — alat lokal</span>
+    <span>Katalog &amp; cache tersimpan di .data/</span>
+  </footer>
+</div>
+
+<script>
+  const $ = (pilih) => document.querySelector(pilih);
+  const form = $("#form-cari");
+  const tombol = $("#tombol");
+  const statusEl = $("#status");
+  const detikEl = $("#detik");
+  const kemajuanEl = $("#kemajuan");
+  const KUNCI_RIWAYAT = "paper-browser:riwayat";
+  // Riwayat dari nama lama aplikasi (Jurnal Browser) dipindahkan sekali ke kunci baru.
+  try {
+    const lama = localStorage.getItem("jurnal-browser:riwayat");
+    if (lama !== null && localStorage.getItem(KUNCI_RIWAYAT) === null) localStorage.setItem(KUNCI_RIWAYAT, lama);
+    localStorage.removeItem("jurnal-browser:riwayat");
+  } catch {
+    // penyimpanan lokal tidak tersedia; riwayat tidak dipakai
+  }
+  const NAMA_MESIN = { katalog: "Katalog", brave: "Brave", bing: "Bing" };
+  const STATUS_SINGKAT = {
+    captcha: "verifikasi tidak diselesaikan",
+    istirahat: "istirahat",
+    gagal: "gagal",
+    tidak_relevan: "hasil tidak relevan",
+    dilewati: "tidak dipakai",
+    kosong: "katalog kosong",
+  };
+  const NAMA_SUMBER = { doaj: "DOAJ", manual: "Manual", otomatis: "Dari hasil pencarian", tetangga: "Se-situs OJS" };
+  const LABEL_PDF = {
+    pdf: "Bisa diunduh",
+    bukan_pdf: "Bukan berkas PDF",
+    gagal: "Gagal dicek",
+    tanpa_tautan: "Tidak ada tautan PDF",
+    belum_dicek: "Belum dicek",
+  };
+  const NAMA_FASE = {
+    katalog: "cari di situs jurnal",
+    pencarian: "Bing/Brave",
+    buka_kandidat: "buka kandidat",
+    buka_ulang_browser: "buka ulang lewat browser",
+    cek_pdf: "cek PDF",
+    katalog_tetangga: "catat jurnal se-situs",
+  };
+  let laporanTerakhir = null;
+
+  const angka = (n, digit = 0) =>
+    Number(n).toLocaleString("id-ID", { minimumFractionDigits: digit, maximumFractionDigits: digit });
+  const namaMesin = (n) => NAMA_MESIN[n] || n;
+  const ukuranRapi = (n) => (!n ? null : n < 1048576 ? `${angka(n / 1024, 1)} KB` : `${angka(n / 1048576, 1)} MB`);
+  const jamDari = (iso) => (iso ? iso.slice(11, 16) : "?");
+  const tanpaSkema = (url) => url.replace(/^https?:\/\//i, "");
+  const nomor2 = (n) => String(n).padStart(2, "0");
+
+  function el(tag, sifat = {}, ...anak) {
+    const e = Object.assign(document.createElement(tag), sifat);
+    e.append(...anak.filter((a) => a != null));
+    return e;
+  }
+
+  // Judul dan nama berasal dari situs pihak ketiga: selalu lewat textContent, dan href hanya http(s).
+  function tautan(href, teks, className = "") {
+    return /^https?:\/\//i.test(href || "")
+      ? el("a", { href, target: "_blank", rel: "noopener noreferrer", textContent: teks, className })
+      : el("span", { textContent: teks, className });
+  }
+
+  // Keterangan status PDF: ukuran atau alasan gagal, cara pengecekan, dan batasan akses.
+  function detailPdf(p) {
+    return [
+      p.status === "pdf" ? ukuranRapi(p.ukuran_byte) : p.alasan,
+      p.dicek_lewat === "browser" ? "dicek lewat browser" : null,
+      p.terbatas ? "akses terbatas" : null,
+    ].filter(Boolean).join(", ");
+  }
+
+  function teksPdf(p) {
+    const detail = detailPdf(p);
+    return (LABEL_PDF[p.status] || p.status) + (detail ? ` (${detail})` : "");
+  }
+
+  // Tombol unduh bila PDF terbukti bisa diunduh, selain itu statusnya; di bawahnya tombol PDF yang terdeteksi di halaman.
+  function blokPdf(p) {
+    const utama = p.status === "pdf" && /^https?:\/\//i.test(p.url_unduh || "")
+      ? el("a", { className: "tombol-pdf", href: p.url_unduh, target: "_blank", rel: "noopener noreferrer", textContent: "Unduh PDF ↓" })
+      : el("span", {
+          className: "status-pdf" + (["bukan_pdf", "gagal"].includes(p.status) ? " buruk" : ""),
+          textContent: LABEL_PDF[p.status] || p.status,
+        });
+    const t = p.tombol[0];
+    const tombolPdf = t
+      ? [tautan(t.url, `tombol “${t.teks || "tanpa teks"}”`), p.tombol.length > 1 ? ` +${p.tombol.length - 1}` : null]
+      : ["tanpa tombol"];
+    const detail = detailPdf(p);
+    return el("div", { className: "blok-pdf" }, utama, el("p", { className: "ket-pdf" }, detail ? `${detail} · ` : null, ...tombolPdf));
+  }
+
+  function setStatus(teks, galat = false) {
+    statusEl.textContent = teks;
+    statusEl.classList.toggle("galat", galat);
+  }
+
+  // Diperbarui hanya saat isinya berubah, supaya pembaca layar tidak mengulang pesan yang sama tiap detik.
+  function setKemajuan(teks) {
+    if (kemajuanEl.textContent !== teks) kemajuanEl.textContent = teks;
+  }
+
+  function sibuk(ya) {
+    tombol.disabled = ya;
+    tombol.textContent = ya ? "Mencari…" : "Cari";
+    $("#garis-proses").hidden = !ya;
+    form.setAttribute("aria-busy", String(ya));
+  }
+
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const data = new FormData(form);
+    const mode = data.get("mode");
+    let mesin = data.getAll("mesin");
+    if (!mesin.length && mode !== "katalog_saja") {
+      $("#opsi-lanjut").open = true;
+      setStatus("Pilih minimal satu mesin pencari di Opsi lanjutan.", true);
+      return;
+    }
+    if (!mesin.length) mesin = ["bing", "brave"]; // tidak dipakai pada mode katalog saja
+    const tampilkan = data.has("tampilkan");
+    const param = new URLSearchParams({
+      q: data.get("q").trim(),
+      situs: data.get("situs").trim(),
+      mesin: mesin.join(","),
+      halaman: data.get("halaman"),
+      maks: data.get("maks"),
+      mode,
+    });
+    if (data.get("jurnal_maks")) param.set("jurnal_maks", data.get("jurnal_maks"));
+    if (tampilkan) param.set("tampilkan", "1");
+    param.set("cadangan", data.has("cadangan") ? "1" : "0");
+    if (data.has("segarkan")) param.set("segarkan", "1");
+
+    sibuk(true);
+    setStatus(tampilkan
+      ? "Mencari… jika jendela browser meminta captcha, tekan “Verify”."
+      : "Mencari… biasanya 30–90 detik.");
+    const mulai = performance.now();
+    const detak = setInterval(() => {
+      detikEl.textContent = `${angka((performance.now() - mulai) / 1000)} dtk`;
+    }, 250);
+    // Pesan kemajuan dari server, mis. saat jendela verifikasi Brave sedang menunggu tombol "Verify".
+    const pantau = setInterval(async () => {
+      try {
+        const st = await (await fetch("/api/status")).json();
+        if (st.aktif) setKemajuan(st.pesan);
+      } catch {
+        // abaikan; pencarian utama tetap berjalan
+      }
+    }, 1000);
+    let berhasil = false;
+    try {
+      const res = await fetch(`/api/cari?${param}`);
+      const isi = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(isi.galat || `HTTP ${res.status}`);
+      laporanTerakhir = isi;
+      tampilkanHasil(isi);
+      simpanRiwayat(isi, param);
+      setStatus(`Selesai dalam ${angka(isi.statistik.durasi_detik, 1)} detik.`);
+      muatKatalog(); // katalog bertambah dari jurnal yang baru ditemukan
+      berhasil = true;
+    } catch (err) {
+      setStatus(`Gagal: ${err.message}`, true);
+    } finally {
+      clearInterval(detak);
+      clearInterval(pantau);
+      detikEl.textContent = "";
+      setKemajuan("");
+      sibuk(false);
+    }
+    // Digulir setelah status dibersihkan: perubahan tata letak di atas hasil memotong animasi gulir yang sedang berjalan.
+    const hasil = $("#hasil");
+    if (berhasil && hasil.getBoundingClientRect().top > innerHeight * 0.6) {
+      requestAnimationFrame(() =>
+        hasil.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
+    }
+  });
+
+  function labelMesin(m) {
+    if (m.status === "ok") {
+      return `${angka(m.hasil)} hasil` + (m.dari_cache ? " (cache)" : m.diverifikasi ? " (setelah verifikasi)" : "");
+    }
+    if (m.status === "istirahat") return `istirahat s.d. ${jamDari(m.istirahat_sampai)}`;
+    return STATUS_SINGKAT[m.status] || m.status;
+  }
+
+  function kelasTag(status) {
+    return status === "ok" ? "tag" : status === "dilewati" ? "tag tag-mati" : "tag tag-masalah";
+  }
+
+  function saranMesin(nama, m) {
+    const sampai = jamDari(m.istirahat_sampai);
+    if (m.status === "tidak_relevan") {
+      return `${nama} mengembalikan hasil yang tidak berhubungan dengan kueri, cara mesin pencari membatasi pencarian ` +
+        "otomatis (terutama kueri dengan fokus situs). Hasilnya dibuang dan tidak disimpan di cache; coba lagi nanti.";
+    }
+    if (m.status === "istirahat" && (m.pesan || "").includes("batas")) {
+      return `${nama} mencapai batas permintaan per jam dan bisa dipakai lagi pukul ${sampai}.`;
+    }
+    const sebab = m.status === "captcha"
+      ? `${nama} meminta verifikasi tetapi tidak diselesaikan dalam 2 menit, jadi diistirahatkan sampai ${sampai}.`
+      : `${nama} sedang diistirahatkan sampai ${sampai} setelah verifikasi yang tidak diselesaikan.`;
+    return `${sebab} Centang “Tampilkan browser” di Opsi lanjutan lalu cari lagi untuk memverifikasinya sekarang.`;
+  }
+
+  function tampilkanHasil(lap) {
+    const s = lap.statistik;
+    $("#hasil").hidden = false;
+    $("#jumlah").textContent = angka(s.ditampilkan);
+    $("#jumlah-jurnal").textContent = angka(s.jumlah_jurnal);
+    $("#jumlah-pdf").textContent = angka(s.pdf_bisa_diunduh);
+    $("#sumber-hasil").replaceChildren(...Object.entries(s.mesin).map(([nama, m]) =>
+      el("li", { className: kelasTag(m.status), title: m.pesan || "" }, el("strong", { textContent: namaMesin(nama) }), labelMesin(m))));
+
+    const kataKatalog = ((s.katalog || {}).putaran || []).map((p) => p.kata).join(" → ");
+    const pakaiMesin = Object.entries(s.mesin).some(([n, m]) => n !== "katalog" && m.status !== "dilewati");
+    $("#keterangan").textContent = [
+      kataKatalog ? `Kata kunci di situs jurnal: ${kataKatalog}` : null,
+      pakaiMesin ? `Kueri Bing/Brave: ${lap.kueri_pencarian}` : null,
+    ].filter(Boolean).join(" · ");
+    const sumber = lap.artikel_sumber;
+    $("#sumber").hidden = !sumber;
+    if (sumber) {
+      $("#sumber").replaceChildren("Artikel sumber: ", tautan(sumber.url, sumber.judul), ` — PDF: ${teksPdf(sumber.analisis_pdf)}`);
+    }
+
+    const tertahan = Object.entries(s.mesin).filter(([, m]) => ["captcha", "istirahat", "tidak_relevan"].includes(m.status));
+    const teksSaran = [
+      (s.mesin.katalog || {}).status === "kosong"
+        ? "Katalog jurnal masih kosong, jadi pencarian memakai Bing/Brave. Klik “Impor / perbarui DOAJ” di bagian " +
+          "Katalog agar kata kunci bisa dicari langsung di ±2.700 situs jurnal Indonesia."
+        : "",
+      tertahan.map(([n, m]) => saranMesin(namaMesin(n), m)).join(" "),
+      tertahan.length ? "Hasil dari sumber lain tetap ditampilkan." : "",
+    ].filter(Boolean).join(" ");
+    $("#saran").hidden = !teksSaran;
+    $("#saran").replaceChildren(el("strong", { className: "label teks-merah", textContent: "Perhatian — " }), teksSaran);
+
+    const rincian = [
+      ["Kandidat dibuka", angka(s.kandidat)],
+      ["Gagal dibuka", angka(s.gagal_dibuka)],
+      s.dibuka_ulang_browser ? ["Pulih lewat browser", `${angka(s.pulih_lewat_browser)}/${angka(s.dibuka_ulang_browser)}`] : null,
+      ["Halaman artikel", angka(s.artikel_jurnal)],
+      ["Duplikat", angka(s.duplikat)],
+      ["Kurang berkaitan", angka(s.tanpa_kata_kueri)],
+      ["Punya tombol PDF", angka(s.punya_tombol_pdf)],
+      ["Durasi", `${angka(s.durasi_detik, 1)} dtk`],
+    ].filter(Boolean);
+    $("#rincian-angka").replaceChildren(...rincian.map(([k, v]) => el("div", {}, el("dt", { textContent: k }), el("dd", { textContent: v }))));
+    $("#info-katalog").textContent = ringkasKatalog(s.katalog);
+    $("#rincian-waktu").textContent = "Waktu: " + Object.entries(s.durasi_fase || {})
+      .map(([fase, d]) => `${NAMA_FASE[fase] || fase} ${angka(d, 1)} dtk`)
+      .join(" · ");
+
+    renderJurnal();
+    renderDaftar();
+
+    const gagal = lap.gagal_dibuka || [];
+    $("#detail-gagal").hidden = !gagal.length;
+    $("#ringkasan-gagal").textContent = `${angka(gagal.length)} kandidat gagal dibuka`;
+    $("#daftar-gagal").replaceChildren(...gagal.map((g) =>
+      el("li", {}, tautan(g.url, g.url), el("span", { className: "redup", textContent: ` — ${g.alasan}` }))));
+  }
+
+  function renderJurnal() {
+    const jurnal = laporanTerakhir.jurnal || [];
+    const baris = jurnal.map((j, i) => el("tr", {},
+      el("td", { className: "nomor-baris", textContent: nomor2(i + 1) }),
+      el("td", {}, tautan(j.situs, j.nama, "nama-jurnal"), j.situs ? el("span", { className: "sub", textContent: tanpaSkema(j.situs) }) : null),
+      el("td", { className: "num jumlah", textContent: angka(j.jumlah_artikel) }),
+    ));
+    if (!baris.length) {
+      baris.push(el("tr", {}, el("td", { colSpan: 3, className: "redup", textContent: "Belum ada jurnal yang ditemukan." })));
+    }
+    $("#daftar-jurnal").replaceChildren(...baris);
+  }
+
+  function itemArtikel(a, nomor) {
+    const penulis = a.penulis.map((p) => p.nama).join(", ");
+    const tahun = (a.tanggal_terbit || "").slice(0, 4);
+    const jurnal = a.situs_jurnal
+      ? tautan(a.situs_jurnal, a.jurnal || tanpaSkema(a.situs_jurnal))
+      : el("span", { textContent: a.jurnal || "jurnal tidak diketahui" });
+    return el("li", { className: "artikel" },
+      el("span", { className: "nomor", textContent: nomor2(nomor) }),
+      el("div", { className: "isi-artikel" },
+        tautan(a.url, a.judul, "judul-artikel"),
+        el("p", { className: "meta-artikel", textContent: [penulis, tahun].filter(Boolean).join(" · ") || "penulis tidak diketahui" }),
+        el("p", { className: "meta-artikel" }, jurnal, ` · lewat ${a.ditemukan_oleh.map(namaMesin).join(", ")} · skor ${angka(a.skor, 2)}`),
+      ),
+      blokPdf(a.analisis_pdf),
+    );
+  }
+
+  function renderDaftar() {
+    if (!laporanTerakhir) return;
+    const semua = laporanTerakhir.artikel;
+    const hanyaPdf = $("#hanya-pdf").checked;
+    // Nomor tetap urutan relevansi asli walau daftar sedang disaring.
+    const terlihat = semua.map((a, i) => [a, i + 1]).filter(([a]) => !hanyaPdf || a.analisis_pdf.status === "pdf");
+    const butir = terlihat.map(([a, nomor]) => itemArtikel(a, nomor));
+    if (!butir.length) {
+      const kosong = hanyaPdf && semua.length ? "Tidak ada artikel yang PDF-nya bisa diunduh." : "Tidak ada artikel jurnal yang berkaitan.";
+      butir.push(el("li", { className: "kosong", textContent: kosong }));
+    }
+    $("#daftar").replaceChildren(...butir);
+    $("#info-filter").textContent = hanyaPdf
+      ? `${angka(terlihat.length)} dari ${angka(semua.length)} artikel`
+      : `${angka(semua.length)} artikel · urut relevansi`;
+  }
+
+  $("#hanya-pdf").addEventListener("change", renderDaftar);
+
+  function bacaRiwayat() {
+    try {
+      return JSON.parse(localStorage.getItem(KUNCI_RIWAYAT)) || [];
+    } catch {
+      return [];
+    }
+  }
+
+  function simpanRiwayat(lap, param) {
+    const s = lap.statistik;
+    const situs = param.get("situs");
+    const riwayat = bacaRiwayat();
+    riwayat.unshift({
+      waktu: lap.waktu,
+      kueri: (lap.sumber || lap.kueri) + (situs ? ` · site:${situs}` : ""),
+      mesin: Object.entries(s.mesin)
+        .map(([n, m]) => `${namaMesin(n)} ${m.status === "ok" ? m.hasil + (m.dari_cache ? " (cache)" : "") : STATUS_SINGKAT[m.status] || m.status}`)
+        .join(", "),
+      halaman: param.get("halaman"),
+      kandidat: s.kandidat,
+      artikel: s.ditampilkan,
+      jurnal: s.jumlah_jurnal,
+      pdf: s.pdf_bisa_diunduh,
+      durasi: s.durasi_detik,
+    });
+    localStorage.setItem(KUNCI_RIWAYAT, JSON.stringify(riwayat.slice(0, 50)));
+    tampilkanRiwayat();
+  }
+
+  function tampilkanRiwayat() {
+    const riwayat = bacaRiwayat();
+    $("#bagian-riwayat").hidden = !riwayat.length;
+    $("#riwayat").replaceChildren(...riwayat.map((r) => el("tr", {},
+      el("td", { className: "waktu", textContent: r.waktu.replace("T", " ").slice(0, 16) }),
+      el("td", {}, el("span", { textContent: r.kueri }), el("span", { className: "sub", textContent: r.mesin })),
+      el("td", { className: "num", textContent: angka(r.artikel) }),
+      el("td", { className: "num", textContent: r.jurnal == null ? "—" : angka(r.jurnal) }),
+      el("td", { className: "num", textContent: r.pdf == null ? "—" : angka(r.pdf) }),
+      el("td", { className: "num", textContent: `${angka(r.durasi, 1)} dtk` }),
+    )));
+  }
+
+  $("#hapus-riwayat").addEventListener("click", () => {
+    localStorage.removeItem(KUNCI_RIWAYAT);
+    tampilkanRiwayat();
+  });
+
+  $("#unduh").addEventListener("click", () => {
+    if (!laporanTerakhir) return;
+    const blob = new Blob([JSON.stringify(laporanTerakhir, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const slug = (laporanTerakhir.kueri || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+    el("a", { href: url, download: `cari-${slug || "hasil"}.json` }).click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  // Ringkasan pencarian langsung di situs jurnal dan pertumbuhan katalog (sama dengan keluaran CLI).
+  function ringkasKatalog(k) {
+    if (!k) return "";
+    const t = k.tetangga || { jurnal_baru: 0, instalasi_dicek: 0 };
+    const akhir = `katalog kini ${angka(k.jurnal_di_katalog)} jurnal (+${angka((k.jurnal_baru || 0) + (k.jurnal_dipelajari || 0))} ` +
+      `dari hasil ini, +${angka(t.jurnal_baru)} dari ${angka(t.instalasi_dicek)} situs se-kampus)`;
+    if (k.status === "dilewati") return `Katalog tidak ditanya (Bing/Brave saja); ${akhir}.`;
+    if (k.status !== "ok") return `Katalog: ${k.pesan}; ${akhir}.`;
+    const rincian = [`${angka(k.permintaan)} permintaan`, `${angka(k.dari_cache)} dari cache`, `${angka(k.durasi_detik, 1)} dtk`];
+    const ditanya = k.jurnal_dipilih
+      ? `${angka(k.jurnal_dipilih)} jurnal ditanya (${[`${angka(k.instalasi)} situs`, ...rincian].join(", ")})`
+      : `${angka(k.instalasi)} situs ditanya (${rincian.join(", ")})`;
+    const masalah = k.diblokir || k.gagal || k.terlalu_lambat
+      ? `; ${angka(k.diblokir)} situs menolak, ${angka(k.gagal)} tak terjangkau, ${angka(k.terlalu_lambat)} terlalu lambat`
+      : "";
+    return `Katalog: ${angka(k.hasil)} hasil dari ${angka(k.situs_memberi_hasil)} situs jurnal; ${ditanya}${masalah}; ${akhir}.`;
+  }
+
+  function setPesanKatalog(teks, galat = false) {
+    const p = $("#pesan-katalog");
+    p.textContent = teks;
+    p.classList.toggle("galat", galat);
+  }
+
+  function tampilkanKatalog(s) {
+    $("#katalog-jumlah").textContent = angka(s.jurnal);
+    $("#katalog-situs").textContent = `jurnal · ${angka(s.instalasi)} situs`;
+    $("#meta-katalog").textContent = `Katalog ${angka(s.jurnal)} jurnal / ${angka(s.instalasi)} situs`;
+    const baris = [
+      ...Object.entries(s.per_sumber || {}).sort((a, b) => b[1] - a[1]).map(([k, n]) => [NAMA_SUMBER[k] || k, n]),
+      ["Pernah memberi hasil", s.pernah_memberi_hasil],
+      ["Situs menolak akses", s.instalasi_diblokir],
+    ];
+    $("#katalog-sumber").replaceChildren(...baris.map(([k, n]) => el("div", {}, el("dt", { textContent: k }), el("dd", { textContent: angka(n) }))));
+    if (!s.jurnal) {
+      setPesanKatalog("Katalog masih kosong: klik “Impor / perbarui DOAJ” (unduh ±25 MB, sekali saja) atau tambahkan URL jurnal.");
+    }
+  }
+
+  async function muatKatalog() {
+    try {
+      const res = await fetch("/api/katalog?batas=1");
+      const isi = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(isi.galat || `HTTP ${res.status}`);
+      tampilkanKatalog(isi.statistik);
+      if (isi.impor_berjalan) setPesanKatalog("Impor DOAJ sedang berjalan…");
+    } catch (err) {
+      setPesanKatalog(`Gagal memuat katalog: ${err.message}`, true);
+    }
+  }
+
+  // Perubahan katalog wajib JSON + header khusus; server menolak permintaan lain (lihat web_jurnal.py).
+  async function kirimJson(url, data) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Paper-Browser": "1" },
+      body: JSON.stringify(data),
+    });
+    const isi = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(isi.galat || `HTTP ${res.status}`);
+    return isi;
+  }
+
+  $("#impor-doaj").addEventListener("click", async () => {
+    const tombolImpor = $("#impor-doaj");
+    tombolImpor.disabled = true;
+    setPesanKatalog("Mengimpor daftar jurnal dari DOAJ… (biasanya 10–60 detik)");
+    const pantau = setInterval(async () => {
+      try {
+        const st = await (await fetch("/api/status")).json();
+        if (st.impor && st.pesan) setPesanKatalog(st.pesan);
+      } catch {
+        // abaikan; impor tetap berjalan
+      }
+    }, 1000);
+    try {
+      const isi = await kirimJson("/api/katalog/impor-doaj", {});
+      const h = isi.impor;
+      tampilkanKatalog(isi.statistik);
+      setPesanKatalog(`DOAJ: ${angka(h.jurnal_indonesia)} jurnal Indonesia; ${angka(h.baru)} baru, ${angka(h.diperbarui)} diperbarui.`);
+    } catch (err) {
+      setPesanKatalog(`Impor gagal: ${err.message}`, true);
+    } finally {
+      clearInterval(pantau);
+      tombolImpor.disabled = false;
+    }
+  });
+
+  $("#form-tambah").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const kotak = $("#url-jurnal");
+    const tombolTambah = $("#tombol-tambah");
+    tombolTambah.disabled = true;
+    try {
+      const isi = await kirimJson("/api/katalog/tambah", { teks: kotak.value });
+      const hitung = (st) => isi.hasil.filter((h) => h.status === st).length;
+      const tidakValid = isi.hasil.filter((h) => h.status === "tidak_valid").map((h) => h.url);
+      tampilkanKatalog(isi.statistik);
+      setPesanKatalog(
+        `${angka(hitung("baru"))} jurnal baru, ${angka(hitung("sudah_ada"))} sudah ada` +
+          (tidakValid.length ? `, ${angka(tidakValid.length)} bukan alamat yang valid (dibiarkan di kotak).` : "."),
+        tidakValid.length > 0,
+      );
+      kotak.value = tidakValid.join("\n");
+    } catch (err) {
+      setPesanKatalog(`Gagal menambah: ${err.message}`, true);
+    } finally {
+      tombolTambah.disabled = false;
+    }
+  });
+
+  // Ringkasan opsi lanjutan yang tidak bawaan, tampil di judul lipatan supaya tetap terlihat walau ditutup.
+  function ringkasOpsi() {
+    const f = form.elements;
+    const mode = f.mode.value;
+    const ubah = [];
+    if (f.situs.value.trim()) ubah.push(`fokus ${f.situs.value.trim()}`);
+    if (mode !== "mesin" && f.jurnal_maks.value !== "100") ubah.push(`${f.jurnal_maks.value || "?"} jurnal`);
+    if (f.maks.value !== "30") ubah.push(`maks ${f.maks.value || "?"}`);
+    if (mode !== "katalog_saja") {
+      const mesin = [...form.querySelectorAll('input[name="mesin"]:checked')].map((i) => namaMesin(i.value));
+      if (mesin.length < 2) ubah.push(mesin.length ? `hanya ${mesin[0]}` : "tanpa mesin pencari");
+      if (f.halaman.value !== "1") ubah.push(`${f.halaman.value} halaman`);
+      if (f.tampilkan.checked) ubah.push("tampilkan browser");
+    }
+    if (!f.cadangan.checked) ubah.push("tanpa buka ulang");
+    if (f.segarkan.checked) ubah.push("abaikan cache");
+    $("#ringkas-opsi").textContent = ubah.join(" · ");
+  }
+
+  // Mode katalog saja tidak memakai mesin pencari; mode Bing/Brave saja tidak memakai katalog.
+  function aturMode() {
+    const mode = form.elements.mode.value;
+    $("#pilih-mesin").disabled = mode === "katalog_saja";
+    $("#jurnal-maks").disabled = mode === "mesin";
+    ringkasOpsi();
+  }
+
+  form.addEventListener("input", ringkasOpsi);
+  $("#pilih-mode").addEventListener("change", aturMode);
+  $("#meta-host").textContent = `Lokal · ${location.host}`;
+  tampilkanRiwayat();
+  aturMode();
+  muatKatalog();
+</script>
+</body>
+</html>

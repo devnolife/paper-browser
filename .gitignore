@@ -1,0 +1,18 @@
+# Lingkungan Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Data lokal: katalog jurnal, cache pencarian, dan kendali mesin pencari
+.data/
+
+# Profil browser berisi cookie (termasuk bukti verifikasi captcha); jangan diunggah
+.profil-*/
+
+# Keluaran pencarian
+hasil/
+
+# Berkas sistem
+Thumbs.db
+desktop.ini
+.DS_Store
