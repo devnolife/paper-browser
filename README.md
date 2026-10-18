@@ -123,7 +123,8 @@ tests/              unit test (pytest)
 ## Pertanyaan dan masukan
 
 Pertanyaan cara pakai bisa diajukan di [Discussions (Q&A)](https://github.com/devnolife/paper-browser/discussions/categories/q-a).
-Laporan bug dan usulan fitur lewat [Issues](https://github.com/devnolife/paper-browser/issues).
+Laporan bug dan usulan fitur lewat [Issues](https://github.com/devnolife/paper-browser/issues). Ingin ikut mengubah
+kode? Baca [panduan kontribusi](CONTRIBUTING.md).
 
 ## Lisensi
 

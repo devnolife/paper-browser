@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Pertanyaan cara pakai
+    url: https://github.com/devnolife/paper-browser/discussions/categories/q-a
+    about: Ajukan pertanyaan di Discussions (Q&A) supaya jawabannya mudah ditemukan orang lain.
